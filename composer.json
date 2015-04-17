@@ -1,0 +1,30 @@
+{
+	"name":"itsoneiota/json",
+	"description": "One iota JSON library.",
+	"type":"library",
+    "version": "1.0.0",
+    "keywords": [
+		"JSON",
+		"JSON-schema",
+		"validation"
+	],
+    "homepage": "http://itsoneiota.com",
+    "authors": [
+        {
+            "name": "Ross McFarlane",
+            "email": "ross@itsoneiota.com"
+        }
+    ],
+    "license":"proprietary",
+	"require":{
+	},
+	"require-dev":{
+		"phpunit/phpunit": "*",
+        "mikey179/vfsStream": "1.3.*@dev"
+	},
+	"autoload": {
+        "psr-4": {
+            "itsoneiota\\json\\": "src/"
+        }
+    }
+}
