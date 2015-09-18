@@ -265,6 +265,9 @@ class JSONSchemaBuilder implements JSONSchemaLoader {
 		if(property_exists($def, 'oneOf')) {
 			$schema->setOneOf($this->inflateSchemaTuple($def->oneOf));
 		}
+		if(property_exists($def, 'not')) {
+			$schema->setNot($this->inflateSchema($def->not));
+		}
 
 		if(property_exists($def, 'properties')) {
 			foreach($def->properties as $name => $propertyDef) {
@@ -283,6 +286,12 @@ class JSONSchemaBuilder implements JSONSchemaLoader {
 			}
 			$schema->setAdditionalProperties(is_bool($def->additionalProperties) ? $def->additionalProperties : $this->inflateSchema($def->additionalProperties));
 		}
+		if(property_exists($def, 'minProperties')) {
+			$schema->setMinProperties($def->minProperties);
+		}
+		if(property_exists($def, 'maxProperties')) {
+			$schema->setMaxProperties($def->maxProperties);
+		}
 		if(property_exists($def, 'items')) {
 			$schema->setItems($this->inflateSchemaTuple($def->items));
 		}
@@ -296,6 +305,11 @@ class JSONSchemaBuilder implements JSONSchemaLoader {
 			$schema->setReadOnly($def->readonly);
 		}
 		if(property_exists($def, 'dependencies')) {
+			foreach ($def->dependencies as $key => $dependencySchemaDef) {
+				if(is_object($dependencySchemaDef) && !is_a($dependencySchemaDef, '\itsoneiota\json\JSONSchema')){
+					$def->dependencies->$key = $this->inflateSchema($dependencySchemaDef);
+				}
+			}
 			$schema->setDependencies($def->dependencies);
 		}
 		if(property_exists($def, 'minimum')) {
@@ -337,8 +351,8 @@ class JSONSchemaBuilder implements JSONSchemaLoader {
 		if(property_exists($def, 'format')) {
 			$schema->setFormat($def->format);
 		}
-		if(property_exists($def, 'divisibleBy')) {
-			$schema->setDivisibleBy($def->divisibleBy);
+		if(property_exists($def, 'multipleOf')) {
+			$schema->setMultipleOf($def->multipleOf);
 		}
 		if(property_exists($def, 'disallow')) {
 			if(is_array($disallow)){

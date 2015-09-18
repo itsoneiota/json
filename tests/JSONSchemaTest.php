@@ -227,6 +227,31 @@ class JSONSchemaTest extends \PHPUnit_Framework_TestCase {
 	}
 
 	/**
+	 * It should validate a union of types, including another schema.
+	 * @test
+	 */
+	public function canValidateUsingNot() {
+		$numberSchema = new JSONSchema();
+		$numberSchema->setType('integer');
+		$numberSchema->setMinimum(2);
+		$numberSchema->setMaximum(3);
+
+		$this->sut->setNot($numberSchema);
+
+		$this->assertTrue($this->sut->validate('object'));
+		$this->assertTrue($this->sut->validate(3.5));
+		$this->assertTrue($this->sut->validate(TRUE));
+		$this->assertTrue($this->sut->validate(new \stdClass()));
+		$this->assertTrue($this->sut->validate(array('a'=>123)));
+		$this->assertTrue($this->sut->validate(NULL));
+
+		$this->assertTrue($this->sut->validate(1));
+		$this->assertFalse($this->sut->validate(2));
+		$this->assertFalse($this->sut->validate(3));
+		$this->assertTrue($this->sut->validate(4));
+	}
+
+	/**
 	 * It should return an error from an additionalProperties schema with anyOf.
 	 * @test
 	 */
@@ -342,6 +367,28 @@ class JSONSchemaTest extends \PHPUnit_Framework_TestCase {
 		$this->assertTrue($this->sut->validate($value));
 
 		$this->sut->setProperty('height', $heightSchema);
+		$this->assertFalse($this->sut->validate($value));
+	}
+
+	/**
+	 * It should validate the quantity of object properties using min/maxProperties.
+	 * @test
+	 */
+	public function canValidateCountOfObjectProperties() {
+		$this->sut->setType('object');
+		$this->sut->setMinProperties(1);
+		$this->sut->setMaxProperties(2);
+
+		$value = new \stdClass();
+		$this->assertFalse($this->sut->validate($value));
+
+		$value->name = 'Ross';
+		$this->assertTrue($this->sut->validate($value));
+
+		$value->age = 30;
+		$this->assertTrue($this->sut->validate($value));
+
+		$value->height = 193;
 		$this->assertFalse($this->sut->validate($value));
 	}
 
@@ -901,8 +948,8 @@ class JSONSchemaTest extends \PHPUnit_Framework_TestCase {
 	 * It should validate that a number is divisible by X.
 	 * @test
 	 */
-	public function canValidateNumberWithDivisibleByConstraint() {
-		$this->sut->setDivisibleBy(3);
+	public function canValidateNumberWithMultipleOfConstraint() {
+		$this->sut->setMultipleOf(3);
 		$this->assertTrue($this->sut->validate(0));
 		$this->assertTrue($this->sut->validate(3));
 		$this->assertTrue($this->sut->validate(6));
@@ -918,8 +965,8 @@ class JSONSchemaTest extends \PHPUnit_Framework_TestCase {
 	 * @test
 	 * @expectedException \InvalidArgumentException
 	 */
-	public function canRejectZeroInSetDivisibleBy() {
-		$this->sut->setDivisibleBy(0);
+	public function canRejectZeroInSetMultipleOf() {
+		$this->sut->setMultipleOf(0);
 	}
 
 	/**
@@ -1088,6 +1135,57 @@ class JSONSchemaTest extends \PHPUnit_Framework_TestCase {
 		$instance->BOOM->A = 7;
 
 		$this->assertTrue($this->sut->validate($instance));
+	}
+
+	/**
+	 * It should validate an object with pattern properties.
+	 * @test
+	 */
+	public function canValidateWithOverlappingPatternProperties() {
+		$propASchema = new \itsoneiota\json\JSONSchema();
+		$propASchema->setType('integer');
+
+		$propBSchema = new \itsoneiota\json\JSONSchema();
+		$propBSchema->setMaximum(20);
+
+		$patternProperties = new \stdClass();
+		$A = 'a*';
+		$B = 'aaa*';
+		$patternProperties->$A = $propASchema;
+		$patternProperties->$B = $propBSchema;
+
+		$this->sut->setType('object');
+		$this->sut->setPatternProperties($patternProperties);
+
+		$instance = new \stdClass();
+		$instance->aaa = 31;
+
+		$this->assertFalse($this->sut->validate($instance));
+	}
+
+	/**
+	 * It should validate an object with pattern properties.
+	 * @test
+	 */
+	public function canValidateWithPropertySchemaOverlappingAPatternProperty() {
+		$propASchema = new \itsoneiota\json\JSONSchema();
+		$propASchema->setType('integer');
+
+		$propBSchema = new \itsoneiota\json\JSONSchema();
+		$propBSchema->setMaximum(20);
+
+		$patternProperties = new \stdClass();
+		$pattern = 'a*';
+		$patternProperties->$pattern = $propBSchema;
+
+		$this->sut->setType('object');
+		$this->sut->setProperty('aaa',$propASchema);
+		$this->sut->setPatternProperties($patternProperties);
+
+		$instance = new \stdClass();
+		$instance->aaa = 31;
+
+		$this->assertFalse($this->sut->validate($instance));
 	}
 
 	/**
@@ -1264,9 +1362,9 @@ class JSONSchemaTest extends \PHPUnit_Framework_TestCase {
 			'phone'=>array('phone'),
 			'uri'=>array('uri'),
 			'email'=>array('email'),
-			'ip-address'=>array('ip-address'),
+			'ipv4'=>array('ipv4'),
 			'ipv6'=>array('ipv6'),
-			'host-name'=>array('host-name')
+			'hostname'=>array('hostname')
 		);
 	}
 
@@ -1503,9 +1601,9 @@ class JSONSchemaTest extends \PHPUnit_Framework_TestCase {
 	 * It should get an example integer with a divisible by property.
 	 * @test
 	 */
-	public function canGetExampleForIntegerDivisibleBy() {
+	public function canGetExampleForIntegerMultipleOf() {
 		$this->sut->setType('integer');
-		$this->sut->setDivisibleBy(9);
+		$this->sut->setMultipleOf(9);
 		$this->assertExampleMatchesSchema();
 	}
 

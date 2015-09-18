@@ -14,17 +14,17 @@ class JSONSchema {
 	const SET_DEFAULTS_WHEN_VALIDATING = 4;
 
 	protected static $types = array('string','number','integer','boolean','object','array','null','any');
-	protected static $defaultFormats = array('date-time','date','time','utc-millisec','regex','color','style','phone','uri','email','ip-address','ipv6','host-name');
+	protected static $defaultFormats = array('date-time','date','time','utc-millisec','regex','color','style','phone','uri','email','ipv4','ipv6','hostname');
 
-	const DATETIME_REGEX = '/^(\d{4})\D?(0[1-9]|1[0-2])\D?([12]\d|0[1-9]|3[01])(\D?([01]\d|2[0-3])\D?([0-5]\d)\D?([0-5]\d)?\D?(\d{3})?([zZ]|([\+-])([01]\d|2[0-3])\D?([0-5]\d)?)?)?$/';
+	const DATETIME_REGEX = '/^(\d{4})\D?(0[1-9]|1[0-2])\D?([12]\d|0[1-9]|3[01])(\D?([01]\d|2[0-3])\D?([0-5]\d)\D?([0-5]\d)?\D?(\d{3}|\d{6})?([zZ]|([\+-])([01]\d|2[0-3])\D?([0-5]\d)?)?)?$/';
 	const DATE_REGEX = '/^(\d{4})\D?(0[1-9]|1[0-2])\D?([12]\d|0[1-9]|3[01])$/';
 	const TIME_REGEX = '/^([01]\d|2[0-3])\D?([0-5]\d)\D?([0-5]\d)?\D?(\d{3})?$/';
 	const CSS_COLOR_REGEX = '/^(#([0-9A-Fa-f]{3,6})\b)|(aqua)|(black)|(blue)|(fuchsia)|(gray)|(green)|(lime)|(maroon)|(navy)|(olive)|(orange)|(purple)|(red)|(silver)|(teal)|(white)|(yellow)|(rgb\(\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*,\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*,\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*\))|(rgb\(\s*(\d?\d%|100%)+\s*,\s*(\d?\d%|100%)+\s*,\s*(\d?\d%|100%)+\s*\))$/';
 	const URI_REGEX = '/^\b((?:[a-z][\w-]+:(?:\/{1,3}|[a-z0-9%])|www\d{0,3}[.])(?:[^\s()<>]+|\([^\s()<>]+\))+(?:\([^\s()<>]+\)|[^`!()\[\]{};:\'".,<>?«»“”‘’\s]))$/';
 	const PHONE_REGEX = '/^\+?[0-9\s]{1,45}$/';
 	const EMAIL_REGEX = '/^[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+(?:[A-Z]{2}|com|org|net|edu|gov|mil|biz|info|mobi|name|aero|asia|jobs|museum)$/i';
-	const HOSTNAME_REGEX = '/^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$/';
-	const IP_ADDRESS_REGEX = '/^(?:\d{1,3}\.){3}\d{1,3}$/';
+	const HOSTNAME_REGEX = '/^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,62}[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]{0,62}[A-Za-z0-9])$/';
+	const IPV4_REGEX = '/^(((\d{1,2})|([01]\d{2})|(2[0-4]\d)|(25[0-5]))\.){3}(((\d{1,2})|([01]\d{2})|(2[0-4]\d)|(25[0-5])))$/';
 	const IPV6_REGEX = '/^(((?=(?>.*?(::))(?!.+\3)))\3?|([\dA-F]{1,4}(\3|:(?!$)|$)|\2))(?4){5}((?4){2}|(25[0-5]|(2[0-4]|1\d|[1-9])?\d)(\.(?7)){3})\z$/i';
 
 	const EXAMPLE_MINIMAL = 0;
@@ -53,6 +53,8 @@ class JSONSchema {
 	protected $exclusiveMaximum = NULL;
 	protected $minItems = NULL;
 	protected $maxItems = NULL;
+	protected $minProperties = NULL;
+	protected $maxProperties = NULL;
 	protected $uniqueItems = FALSE;
 	protected $pattern = NULL;
 	protected $minLength = NULL;
@@ -60,13 +62,14 @@ class JSONSchema {
 	protected $enum = NULL;
 	protected $title;
 	protected $format = NULL;
-	protected $divisibleBy;
+	protected $multipleOf;
 	protected $disallow;
 	protected $ref; // Equivalent to $ref in the JSON Schema spec.
 
 	protected $allOf = array();
 	protected $anyOf = array();
 	protected $oneOf = array();
+	protected $not = NULL;
 
 	protected $errors;
 	protected $errorContainer;
@@ -248,6 +251,17 @@ class JSONSchema {
 	public function setOneOf(array $oneOf) {
 		$this->assertSchemaArrayIsValid($oneOf);
 		$this->oneOf = $oneOf;
+	}
+
+	/**
+	 * Set the not schema.
+	 *
+	 * @param array JSONSchema instance.
+	 * @return void
+	 * @throws \InvalidArgumentException if the array is empty, or if it contains anything other than a JSONSchema instances.
+	 */
+	public function setNot(JSONSchema $not) {
+		$this->not = $not;
 	}
 
 	protected function assertSchemaArrayIsValid(array $schemaArray) {
@@ -464,6 +478,32 @@ class JSONSchema {
 		$this->maxItems = $maxItems;
 	}
 	/**
+	 * Set maximum number of properties for an object instance.
+	 *
+	 * @param numeric $maxProperties
+	 * @return void
+	 * @throws \InvalidArgumentException if $minProperties is not an integer.
+	 */
+	public function setMinProperties($minProperties){
+		if(gettype($minProperties)!=='integer'){
+			throw new \InvalidArgumentException('minProperties must be an integer.');
+		}
+		$this->minProperties = $minProperties;
+	}
+	/**
+	 * Set maximum number of properties for an object instance.
+	 *
+	 * @param numeric $maxProperties
+	 * @return void
+	 * @throws \InvalidArgumentException if $maxProperties is not an integer.
+	 */
+	public function setMaxProperties($maxProperties){
+		if(gettype($maxProperties)!=='integer'){
+			throw new \InvalidArgumentException('MaxProperties must be an integer.');
+		}
+		$this->maxProperties = $maxProperties;
+	}
+	/**
 	 * Set uniqueItems attribute, indicating that all items in an array MUST be unique.
 	 *
 	 * @param boolean $uniqueItems
@@ -572,18 +612,18 @@ class JSONSchema {
 	/**
 	 * Set the number by which a numeric instance must be divisible by.
 	 *
-	 * @param numeric $divisibleBy
+	 * @param numeric $multipleOf
 	 * @return void
-	 * @throws \InvalidArgumentException if divisibleBy is not numeric or is 0.
+	 * @throws \InvalidArgumentException if multipleOf is not numeric or is 0.
 	 */
-	public function setDivisibleBy($divisibleBy){
-		if(!is_numeric($divisibleBy)){
-			throw new \InvalidArgumentException('divisibleBy must be numeric.');
+	public function setMultipleOf($multipleOf){
+		if(!is_numeric($multipleOf)){
+			throw new \InvalidArgumentException('multipleOf must be numeric.');
 		}
-		if($divisibleBy == 0){
-			throw new \InvalidArgumentException('divisibleBy should not be 0.');
+		if($multipleOf == 0){
+			throw new \InvalidArgumentException('multipleOf should not be 0.');
 		}
-		$this->divisibleBy = $divisibleBy;
+		$this->multipleOf = $multipleOf;
 	}
 	/**
 	 * Set type(s) that are NOT allowed.
@@ -644,6 +684,15 @@ class JSONSchema {
 		return array_map($pathMapper, $this->errorContainer->errors);
 	}
 
+	public function validateJSONString($JSON){
+		$value = json_decode($JSON);
+		if(json_last_error() !== JSON_ERROR_NONE){
+			$this->addError('Invalid JSON.');
+			return FALSE;
+		}
+		return $this->validate($value);
+	}
+
 	public function validate($value, \stdClass $errorContainer=NULL) {
 		$stackedErrorContainer = FALSE;
 		if(NULL === $errorContainer){
@@ -661,6 +710,7 @@ class JSONSchema {
 					$this->validateAllOf($value) &&
 					$this->validateAnyOf($value) &&
 					$this->validateOneOf($value) &&
+					$this->validateNot($value) &&
 					$this->validateDisallowedTypes($value) &&
 					$this->validateNumber($value) &&
 					$this->validateRequiredProperties($value) &&
@@ -755,6 +805,11 @@ class JSONSchema {
 				}
 				break;
 			case 'integer':
+				if(is_float($value)){
+					$valid = FALSE;
+				}elseif (!is_integer($value)) {
+					$valid = FALSE;
+				}
 			case 'array':
 			case 'object':
 			case 'boolean':
@@ -846,6 +901,18 @@ class JSONSchema {
 		return FALSE;
 	}
 
+	public function validateNot($value){
+		if (NULL === $this->not) {
+			return TRUE;
+		}
+
+		$valid = !$this->not->validate($value);
+		if(!$valid){
+			$this->addError('Value passes against "not" schema.');
+		}
+		return $valid;
+	}
+
 	/**
 	 * Ensure that the given value doesn't match any disallowed types.
 	 *
@@ -914,13 +981,24 @@ class JSONSchema {
 		}
 		$valid = TRUE;
 
+		$propertyCount = count(get_object_vars($value));
+		if (NULL !== $this->minProperties && $propertyCount < $this->minProperties) {
+			$this->addError("The object has $propertyCount properties. It should have at least $this->maxProperties.");
+			return FALSE;
+		}
+		if (NULL !== $this->maxProperties && $propertyCount > $this->maxProperties) {
+			$this->addError("The object has $propertyCount properties. It should not exceed $this->maxProperties.");
+			return FALSE;
+		}
+
 		// Now validate each property.
 		foreach($value as $property => $propertyValue) {
+			$matched = FALSE;
 			// Explicitly defined properties.
 			if (isset($this->properties[$property])) {
 				$propertyIsValid = $this->validateSubSchema($this->properties[$property], $propertyValue, $property);
 				$valid = $valid && $propertyIsValid;
-				continue;
+				$matched = TRUE;
 			}
 
 			// Pattern properties
@@ -933,12 +1011,16 @@ class JSONSchema {
 						if(!$this->validateSubSchema($schema,$propertyValue,$property)){
 							$valid = FALSE;
 						}
-						break;
+						$matched = TRUE;
 					}
 				}
 				if ($matchedAgainstPattern) {
 					continue;
 				}
+			}
+
+			if($matched){
+				continue;
 			}
 
 			// We now have an additional property.
@@ -1053,8 +1135,8 @@ class JSONSchema {
 			$this->addError("Value of $value exceeds maximum of $this->maximum.");
 			return FALSE;
 		}
-		if(!is_null($this->divisibleBy) && ($value/$this->divisibleBy != floor($value/$this->divisibleBy))){
-			$this->addError("Value is not divisibleBy $this->divisibleBy.");
+		if(!is_null($this->multipleOf) && ($value/$this->multipleOf != floor($value/$this->multipleOf))){
+			$this->addError("Value is not multiple of $this->multipleOf.");
 			return FALSE;
 		}
 		return TRUE;
@@ -1070,7 +1152,7 @@ class JSONSchema {
 			return TRUE;
 		}
 		// Validate length.
-		$length = strlen($value);
+		$length = iconv_strlen($value, 'UTF-8');
 		if(!is_null($this->minLength) && $length < $this->minLength) {
 			$this->addError("String length of $length does not meet minimum length of $this->minLength.");
 			return FALSE;
@@ -1098,11 +1180,24 @@ class JSONSchema {
 		if(is_null($this->enum)){
 			return TRUE;
 		}
-		if(!in_array($value,$this->enum, $strictMatch)){
-			$this->addError("Value is not present in the enumeration.");
-			return FALSE;
+		$found = FALSE;
+		foreach ($this->enum as $enumValue) {
+			if($strictMatch){
+				$found = $value===$enumValue;
+			}else{
+				if(is_object($value) xor is_object($enumValue)){
+					continue;
+				}
+				$found = $value==$enumValue;
+			}
+			if($found){
+				break;
+			}
 		}
-		return TRUE;
+		if(!$found){
+			$this->addError("Value is not present in the enumeration.");
+		}
+		return $found;
 	}
 	/**
 	 * Validate against a pre-defined format.
@@ -1168,9 +1263,9 @@ class JSONSchema {
 					$valid = FALSE;
 				}
 				break;
-			case 'ip-address':
+			case 'ipv4':
 				$matches = array();
-				if(!preg_match(self::IP_ADDRESS_REGEX,$value, $matches)){
+				if(!preg_match(self::IPV4_REGEX,$value, $matches)){
 					$valid = FALSE;
 				}
 				break;
@@ -1180,7 +1275,7 @@ class JSONSchema {
 					$valid = FALSE;
 				}
 				break;
-			case 'host-name':
+			case 'hostname':
 				$matches = array();
 				if(!preg_match(self::HOSTNAME_REGEX,$value, $matches)){
 					$valid = FALSE;
@@ -1410,13 +1505,13 @@ class JSONSchema {
 			case 'email':
 				return 'itsoneiota@example.com';
 				break;
-			case 'ip-address':
+			case 'ipv4':
 				return '192.0.2.0';
 				break;
 			case 'ipv6':
 				return '2001:0db8:85a3:0042:1000:8a2e:0370:7334';
 				break;
-			case 'host-name':
+			case 'hostname':
 				return 'example.com';
 				break;
 			case NULL:
@@ -1457,8 +1552,8 @@ class JSONSchema {
 	 */
 	protected function exemplifyInteger() {
 		list($min,$max) = $this->getMinAndMax();
-		if ($this->divisibleBy) {
-			return $this->divisibleBy > $min ? $this->divisibleBy : $this->divisibleBy * floor($max/$divisibleBy);
+		if ($this->multipleOf) {
+			return $this->multipleOf > $min ? $this->multipleOf : $this->multipleOf * floor($max/$multipleOf);
 		}
 		return rand($min,$max);
 	}
